@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Sidebar from "../components/Sidebar"
 import Navbar from "../components/Navbar"
 import StatsCard from "../components/Statscard"
@@ -18,26 +18,38 @@ CartesianGrid
 } from "recharts"
 
 export default function Dashboard(){
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-const [goal,setGoal] = useState(60)
-const [nudges,setNudges] = useState(14)
-const [activeTab,setActiveTab] = useState("dashboard")
+  const [goal,setGoal] = useState(60)
+  const [nudges,setNudges] = useState(0)
+  const [activeTab,setActiveTab] = useState("dashboard")
 
-const [timer,setTimer] = useState(0)
-const [selectedWorkout,setSelectedWorkout] = useState("")
-const [isWorkoutActive,setIsWorkoutActive] = useState(false)
+  const [timer,setTimer] = useState(0)
+  const [selectedWorkout,setSelectedWorkout] = useState("")
+  const [isWorkoutActive,setIsWorkoutActive] = useState(false)
 
-const [suggestion,setSuggestion] = useState("")
-const [wellnessScore,setWellnessScore] = useState(88)
+  const [suggestion,setSuggestion] = useState("")
+  const [wellnessScore,setWellnessScore] = useState(0)
+  const [statsData,setStatsData] = useState<any>({})
 
-const [username,setUsername] = useState("")
-const [gender,setGender] = useState("")
-const [height,setHeight] = useState("")
-const [weight,setWeight] = useState("")
-const [age,setAge] = useState("")
-const [profileSaved,setProfileSaved] = useState(false)
+  const [username,setUsername] = useState("")
+  const [gender,setGender] = useState("")
+  const [height,setHeight] = useState("")
+  const [weight,setWeight] = useState("")
+  const [age,setAge] = useState("")
+  const [profileSaved,setProfileSaved] = useState(false)
 
-const totalTime = 30
+  const [apiNudge, setApiNudge] = useState<string | null>(null)
+  const [weeklyData, setWeeklyData] = useState<any[]>([])
+
+  const totalTime = 30
+
+  // load initial data from backend
+  useEffect(() => {
+    fetchStats()
+    fetchNudge()
+    fetchActivity()
+  }, [])
 
 /* SMART NUDGES */
 
@@ -122,7 +134,72 @@ const leaderboard=[
 
 const increaseGoal=()=>setGoal(goal+10)
 
-const completeNudge=()=>setNudges(nudges+1)
+const completeNudge=async()=>{
+  setNudges(prev=>prev+1)
+  try{
+    const res = await fetch(`${API_URL}/nudge`)
+    const data = await res.json()
+    setApiNudge(data.nudge)
+  }catch(err){
+    console.error("failed to fetch new nudge", err)
+  }
+}
+
+/* API helpers */
+async function fetchStats(){
+  try{
+    const res = await fetch(`${API_URL}/stats`)
+    const data = await res.json()
+    setStatsData(data)
+    if (data.points != null) setWellnessScore(data.points)
+    // after we have stats, request an AI recommendation as well
+    fetchAiRecommendation()
+  }catch(err){
+    console.error("error getting stats", err)
+  }
+}
+
+async function fetchAiRecommendation(){
+  try{
+    const res = await fetch(`${API_URL}/ai/recommendation`)
+    const data = await res.json()
+    if(data.recommendation) setSuggestion(data.recommendation)
+  }catch(err){
+    console.error("error getting ai recommendation", err)
+  }
+}
+
+async function fetchNudge(){
+  try{
+    const res = await fetch(`${API_URL}/nudge/next`)
+    const data = await res.json()
+    setApiNudge(data.nudge)
+  }catch(err){
+    console.error(err)
+  }
+}
+
+async function fetchActivity(){
+  try{
+    const res = await fetch(`${API_URL}/activity`)
+    const data = await res.json()
+    setWeeklyData(data)
+  }catch(err){
+    console.error(err)
+  }
+}
+
+async function startSession(){
+  try{
+    await fetch(`${API_URL}/session/start`, { method: 'POST' })
+  }catch(err){console.error(err)}
+}
+
+async function finishSession(){
+  try{
+    await fetch(`${API_URL}/session/finish`, { method: 'POST' })
+  }catch(err){console.error(err)}
+}
 
 /* START WORKOUT */
 
@@ -177,18 +254,7 @@ alert("Profile saved")
 
 /* WEEKLY GRAPH */
 
-const weeklyData=[
-
-{day:"Sun",minutes:120},
-{day:"Mon",minutes:46},
-{day:"Tue",minutes:80},
-{day:"Wed",minutes:95},
-{day:"Thu",minutes:60},
-{day:"Fri",minutes:110},
-{day:"Sat",minutes:70}
-
-]
-
+// weeklyData is controlled via state and populated from the backend
 const progress=((totalTime-timer)/totalTime)*283
 
 return(
@@ -211,10 +277,10 @@ return(
 
 <div className="grid grid-cols-2 gap-6">
 
-<TimerCard/>
+<TimerCard onStart={startSession} onFinish={finishSession} />
 
 <div onClick={completeNudge}>
-<NudgeCard/>
+  <NudgeCard nudge={apiNudge || ""} />
 </div>
 
 </div>
@@ -238,10 +304,12 @@ Increase Goal
 
 </div>
 
-<div className="grid grid-cols-3 gap-6 mt-6">
+<div className="grid grid-cols-5 gap-6 mt-6">
 
 <StatsCard title="Focus Minutes Today" value="320"/>
 <StatsCard title="Nudges Completed" value={nudges}/>
+<StatsCard title="Water (glasses)" value={statsData.water ?? "-"}/>
+<StatsCard title="Streak" value={statsData.streak ?? "-"}/>
 <StatsCard title="Wellness Score" value={wellnessScore+"%"}/>
 
 </div>

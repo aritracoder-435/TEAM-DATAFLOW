@@ -2,7 +2,17 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+The frontend expects a running backend API at `http://localhost:5000` during development, or you can point it at your deployed backend by setting `NEXT_PUBLIC_API_URL` (for example `https://team-dataflow.vercel.app`). The environment variable is stored in `.env.local`.
+
+When you’re developing locally you can still start the server from the `backend` folder if needed:
+
+```bash
+cd ../backend
+npm install          # first time only
+node server.js        # or nodemon if you have it installed
+```
+
+Once the backend is running, start the development server:
 
 ```bash
 npm run dev
@@ -14,6 +24,15 @@ pnpm dev
 bun dev
 ```
 
+The front end hits the following API endpoints relative to `NEXT_PUBLIC_API_URL`:
+
+- `GET /stats` – stats object
+- `GET /activity` – weekly activity data
+- `GET /nudge/next` – random nudge
+- `GET /ai/recommendation` – simple AI suggestion
+- `POST /session/start` and `/session/finish` – log focus sessions
+
+Change these paths accordingly if you adapt the backend.
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
